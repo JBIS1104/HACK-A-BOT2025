@@ -9,6 +9,10 @@ Application Module Library (modlib) is an SDK designed to simplify and streamlin
     <img src="assets/hackabot-demo.jpg" alt="HACK-A-BOT project demo" width="520" />
 </p>
 
+<p align='center'>
+    <a href="https://youtube.com/shorts/Sxucuh2GTYQ?feature=share"><b>Watch AI Camera Demo Video</b></a>
+</p>
+
 ## 1. Development environment setup.
 ```
 make setup
