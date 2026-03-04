@@ -3,6 +3,12 @@
 Application Module Library (modlib) is an SDK designed to simplify and streamline the process of creating <b>end-to-end</b> applications for the <b>IMX500 vision sensor</b>.
 </p>
 
+## Project Demo
+
+<p align='center'>
+    <img src="assets/hackabot-demo.jpg" alt="HACK-A-BOT project demo" width="520" />
+</p>
+
 ## 1. Development environment setup.
 ```
 make setup
