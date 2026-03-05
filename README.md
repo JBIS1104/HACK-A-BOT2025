@@ -1,6 +1,6 @@
-<h1 align='center'><b>Application Module Library</b></h1>
+<h1 align='center'><b>AI Classroom Assistant — HACK-A-BOT 2025</b></h1>
 <p align='center'>
-Application Module Library (modlib) is an SDK designed to simplify and streamline the process of creating <b>end-to-end</b> applications for the <b>IMX500 vision sensor</b>.
+  A unified AI camera system that automates classroom <b>attendance tracking</b> and <b>attentiveness monitoring</b> in real time — built in under 24 hours, placing <b>3rd at the University of Manchester Hackathon 2025</b>.
 </p>
 
 ## Project Demo
@@ -13,86 +13,120 @@ Application Module Library (modlib) is an SDK designed to simplify and streamlin
     <a href="https://youtube.com/shorts/Sxucuh2GTYQ?feature=share"><b>Watch AI Camera Demo Video</b></a>
 </p>
 
-## 1. Development environment setup.
+---
+
+## What it does
+
+Traditional classrooms handle attendance and attentiveness as two separate, manual tasks. This project merges both into a single AI camera pipeline running on a **Raspberry Pi AI Camera (IMX500 vision sensor)**.
+
+**The system outputs three live metrics per frame:**
+| Metric | Description |
+|---|---|
+| `attendance` | % of expected students detected in frame (confidence > 0.3) |
+| `questions` | Number of students with hands raised |
+| `understand` | Number of students present but not raising their hand |
+
+These are served in real time as a **JSON payload** via a Flask HTTP endpoint, consumable by any dashboard or display.
+
+---
+
+## How the code works
+
+### Pipeline overview
+
 ```
-make setup
+Raspberry Pi AI Camera (IMX500)
+        │
+        ▼
+   PoseNet model (on-device inference)
+        │  17-point body keypoints per person
+        ▼
+   Confidence filter (> 0.3 threshold)
+        │  valid detections only
+        ▼
+   is_hands_up() check per person
+        │  wrist keypoints compared against shoulder keypoints
+        ▼
+   Attendance % + Questions + Understand counts
+        │
+        ▼
+   JSON output via Flask  +  Annotated frame display
 ```
 
-> Unit-tests are included in the corresponding `/tests` folder and can be exectued by running:
-> `make test`  
-> This also generates a corresponding coverage report.
->
-> Linting corrections and checks (black, isort & flake8) by running:
-> `make lint`
+### Key implementation details
 
-## 2. Building the Python wheel.
-One can create a wheel file of the Application Module Library by running:
+**1. On-device pose estimation (`hands_up_counter_json.py`)**
+- Deploys a **PoseNet** model directly onto the IMX500 sensor using the `modlib` SDK
+- Each detected person returns a 34-element flat array of keypoints, reshaped to **17 × 2 (x, y)** coordinates covering: nose, eyes, ears, shoulders, elbows, wrists, hips, knees, ankles
+- Skeleton lines are drawn between connected joints (arms, shoulders, torso, legs) using `cv2.line`
+
+**2. Hand-raise detection (`is_hands_up`)**
+- Checks whether **wrist keypoints (indices 9 & 10)** are positioned above the corresponding **shoulder keypoints (indices 5 & 6)** in pixel coordinates
+- Only runs on keypoints with confidence > 0.3 to avoid false positives from occluded joints
+- A green circle is drawn above the head of any student detected with hands raised
+
+**3. Metrics calculation**
+```python
+attendance = (total_valid / total_student) * 100
+questions  = hands_up_count          # raised hands
+understand = total_valid - hands_up_count  # present, not raising hand
 ```
-make build
+
+**4. JSON output & Flask server**
+- Results per frame are packaged into a dict and served via Flask at `0.0.0.0:5050`
+- The live annotated frame (with attendance %, Q count, understand count overlaid) is displayed via `frame.display()`
+
+---
+
+## Repository structure
+
 ```
-The generated wheel file located in the `/dist` folder can be used to install the library in you project environment.
-Your virtual environment has some prerequisites and should enable system-site-packages. Example:
-1. Ensure that your Raspberry Pi runs the latest software:
+final_code/
+    hands_up_counter_json.py   # Final submission — Flask + JSON output
+Group21_Works/
+    hands_up_counter_json.py   # Development version
+modlib/                        # Application Module Library (IMX500 SDK)
+tests/                         # Unit tests for modlib
 ```
+
+---
+
+## Setup & installation
+
+### 1. Raspberry Pi prerequisites
+```bash
 sudo apt update && sudo apt full-upgrade
 sudo apt install imx500-all
 sudo apt install python3-opencv python3-munkres python3-picamera2
 ```
 Reboot if needed.
 
-2. Create your project virtual environment and install modlib.
-```
+### 2. Install the modlib wheel
+```bash
 python -m venv .venv --system-site-packages
 . .venv/bin/activate
 pip install modlib-<version>-py3-none-any.whl
 ```
 
-## Basic example
-
-As a basic example let's demonstrate the usage of the Raspberry Pi AiCamera device using a pre-trained SSDMobileNetV2FPNLite320x320 model.
-Create a new file `hello_world.py` with the following content.
-
-
-```python title="hello_world.py"
-from modlib.apps import Annotator
-from modlib.devices import AiCamera
-from modlib.models.zoo import SSDMobileNetV2FPNLite320x320
-
-device = AiCamera()
-model = SSDMobileNetV2FPNLite320x320()
-device.deploy(model)
-
-annotator = Annotator(thickness=1, text_thickness=1, text_scale=0.4)
-
-with device as stream:
-    for frame in stream:
-        detections = frame.detections[frame.detections.confidence > 0.55]
-        labels = [f"{model.labels[class_id]}: {score:0.2f}" for _, score, class_id, _ in detections]
-        
-        annotator.annotate_boxes(frame, detections, labels=labels)
-        frame.display()
+Or build the wheel from source:
+```bash
+make setup
+make build
 ```
 
-3. Run the example, and make sure the Application Module Library is installed in your environment.
-
+### 3. Run the classifier
+```bash
+. .venv/bin/activate
+python final_code/hands_up_counter_json.py
 ```
-. .venv/bin/activate && python hello_world.py
-```
 
-Note that the Application Module Library API allows you to create custom Models and combine any network.rpk with your own custom post_processing function. More information in `docs > getting_started > custom_models.md`.
+The Flask server starts at port `5050`. JSON metrics are available at `http://<pi-ip>:5050`.
 
-## Releases
+> Run tests: `make test`  
+> Run linter: `make lint`
 
-Release tags must be of the format "\d+\.\d+\.\d+" example "1.0.4".
+---
 
 ## License
 
 [LICENSE](./LICENSE)
-
-## Notice
-
-Sony Semiconductor Solutions Corporation assumes no responsibility for applications created using this library. Use of the library is entirely at the user's own risk.
-
-### Security
-
-Please read the Site Policy of GitHub and understand the usage conditions.
